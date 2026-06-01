@@ -15,6 +15,7 @@ object Features {
   const val LIVE_UPDATE_NOTIFICATION = 1 shl 11
 
   object Ext {
+    const val APPLICATION_EXPORT = -1 shl 7
     const val APPLICATION_PROP = -1 shl 0
     const val APPLICATION_INSTALL_SOURCE = -1 shl 1
     const val ELF_PAGE_SIZE_16KB = -1 shl 2

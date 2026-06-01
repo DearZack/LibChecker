@@ -806,6 +806,14 @@ abstract class BaseAppDetailActivity :
               }
             }
           }
+
+          Features.Ext.APPLICATION_EXPORT -> {
+            featureAdapter.addData(
+              FeatureItem(R.drawable.ic_app_export) {
+                FeaturesDialog.showAppExportDialog(this, it.packageInfo)
+              }
+            )
+          }
         }
       }.launchIn(lifecycleScope)
       it.abiBundleStateFlow.onEach { bundle ->

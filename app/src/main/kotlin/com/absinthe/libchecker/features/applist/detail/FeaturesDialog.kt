@@ -31,6 +31,7 @@ import com.absinthe.libchecker.features.applist.detail.ui.EXTRA_PACKAGE_INFO
 import com.absinthe.libchecker.features.applist.detail.ui.EXTRA_PACKAGE_NAME
 import com.absinthe.libchecker.features.applist.detail.ui.EXTRA_PROPS
 import com.absinthe.libchecker.ui.base.BaseAlertDialogBuilder
+import com.absinthe.libchecker.ui.fragment.detail.AppExportBSDFragment
 import com.absinthe.libchecker.utils.Telemetry
 import com.absinthe.libchecker.utils.Toasty
 import com.absinthe.libchecker.utils.UiUtils
@@ -305,6 +306,17 @@ object FeaturesDialog {
       Constants.Event.FEATURE_DIALOG,
       mapOf(Telemetry.Param.CONTENT to context.getString(titleRes))
     )
+  }
+
+  fun showAppExportDialog(activity: FragmentActivity, packageInfo: PackageInfo?) {
+    val pi = packageInfo ?: return
+
+    AppExportBSDFragment().apply {
+      arguments = bundleOf(
+        EXTRA_PACKAGE_INFO to pi
+      )
+      show(activity.supportFragmentManager, AppExportBSDFragment::class.java.name)
+    }
   }
 
   private fun commonShowDialogImpl(

@@ -41,15 +41,11 @@ fun Project.setupAppModule(block: BaseAppModuleExtension.() -> Unit = {}) {
         )
       }
     }
-    val releaseSigning = if (project.hasProperty("releaseStoreFile")) {
-      signingConfigs.create("release") {
-        storeFile = File(project.properties["releaseStoreFile"] as String)
-        storePassword = project.properties["releaseStorePassword"] as String
-        keyAlias = project.properties["releaseKeyAlias"] as String
-        keyPassword = project.properties["releaseKeyPassword"] as String
-      }
-    } else {
-      signingConfigs.getByName("debug")
+    val releaseSigning = signingConfigs.create("release") {
+      storeFile = rootProject.file("release.jks")
+      storePassword = System.getenv("STORE_PASSWORD")
+      keyAlias = System.getenv("KEY_ALIAS")
+      keyPassword = System.getenv("KEY_PASSWORD")
     }
     buildTypes {
       debug {

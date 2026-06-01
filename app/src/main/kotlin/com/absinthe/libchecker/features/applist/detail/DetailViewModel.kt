@@ -662,6 +662,7 @@ class DetailViewModel : ViewModel() {
   fun initFeatures(packageInfo: PackageInfo, features: Int) = viewModelScope.launch(Dispatchers.IO) {
     Timber.d("initFeatures: features = $features")
 
+    _featuresFlow.emit(VersionedFeature(Features.Ext.APPLICATION_EXPORT))
     _featuresFlow.emit(VersionedFeature(Features.Ext.APPLICATION_PROP))
 
     if (OsUtils.atLeastR() && !isApk) {
