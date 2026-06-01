@@ -59,12 +59,11 @@ jobs:
           printf '%s' "$PATCH_B64" | base64 -d | gunzip > /tmp/patch.diff
           git apply --3way /tmp/patch.diff
 
-          # Commit and push
+          # Commit (don't push yet - push after build succeeds)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Apply app-export patch for ${TAG}"
-          git push origin "HEAD:refs/heads/${BRANCH}"
 
       - name: Set up JDK 17
         if: steps.check.outputs.exists == 'false'
@@ -81,19 +80,38 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew assembleFossRelease assembleMarketRelease
 
-      - name: Create Release
+      - name: Push branch and create Release
         if: steps.check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.PAT }}
         run: |
           TAG="${{ steps.tag.outputs.version }}"
-          APK_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          APK_PATH="LibChecker_${TAG}.apk"
-          mv "$APK_SRC" "$APK_PATH"
+          BRANCH="fork_${TAG}"
+
+          # Push branch only after build succeeds
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+          # Find APKs from both flavors
+          FOSS_APK=$(find app/build/outputs/apk/foss/release -name "*.apk" | head -1)
+          MARKET_APK=$(find app/build/outputs/apk/market/release -name "*.apk" | head -1)
+
+          # Rename APKs
+          APK_LIST=""
+          if [ -n "$FOSS_APK" ]; then
+            FOSS_NAME="LibChecker_${TAG}_foss.apk"
+            mv "$FOSS_APK" "$FOSS_NAME"
+            APK_LIST="$APK_LIST $FOSS_NAME"
+          fi
+          if [ -n "$MARKET_APK" ]; then
+            MARKET_NAME="LibChecker_${TAG}_market.apk"
+            mv "$MARKET_APK" "$MARKET_NAME"
+            APK_LIST="$APK_LIST $MARKET_NAME"
+          fi
+
           gh release create "fork_${TAG}" \
             --repo "${{ github.repository }}" \
             --title "LibChecker fork_${TAG}" \
             --notes "Based on upstream tag ${TAG} with app-export patch" \
-            "$APK_PATH"
+            $APK_LIST
