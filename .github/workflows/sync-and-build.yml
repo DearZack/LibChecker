@@ -55,8 +55,8 @@ jobs:
           printf '%s' "$JKS_BASE64" | base64 -d > release.jks
           echo "release.jks" >> .gitignore
 
-          # Apply patch from secret (base64 avoids shell interpreting $ in patch)
-          printf '%s' "$PATCH_B64" | base64 -d > /tmp/patch.diff
+          # Apply patch from secret (gzip + base64 to fit GitHub Secret size limit)
+          printf '%s' "$PATCH_B64" | base64 -d | gunzip > /tmp/patch.diff
           git apply --3way /tmp/patch.diff
 
           # Commit and push
