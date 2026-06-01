@@ -1,0 +1,99 @@
+name: Sync Upstream Tag & Build APK
+
+on:
+  schedule:
+    - cron: '0 10 * * *'  # UTC 10:00 = 北京时间 18:00
+  workflow_dispatch:
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT }}
+
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/LibChecker/LibChecker.git || true
+          git fetch upstream --tags
+
+      - name: Get latest upstream tag
+        id: tag
+        run: |
+          LATEST_TAG=$(git tag -l --sort=-v:refname | grep -E '^[0-9]+\.[0-9]+' | head -1)
+          echo "version=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest upstream tag: $LATEST_TAG"
+
+      - name: Check if branch already exists
+        id: check
+        run: |
+          BRANCH="fork_${{ steps.tag.outputs.version }}"
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Branch $BRANCH already exists, skipping."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Branch $BRANCH does not exist, will create."
+          fi
+
+      - name: Create branch and apply patch
+        if: steps.check.outputs.exists == 'false'
+        env:
+          PATCH_B64: ${{ secrets.PATCH_CONTENT }}
+          JKS_BASE64: ${{ secrets.JKS_BASE64 }}
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          BRANCH="fork_${TAG}"
+
+          # Create branch from upstream tag
+          git checkout -b "$BRANCH" "$TAG"
+
+          # Write JKS file from secret (exclude from git)
+          printf '%s' "$JKS_BASE64" | base64 -d > release.jks
+          echo "release.jks" >> .gitignore
+
+          # Apply patch from secret (base64 avoids shell interpreting $ in patch)
+          printf '%s' "$PATCH_B64" | base64 -d > /tmp/patch.diff
+          git apply --3way /tmp/patch.diff
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply app-export patch for ${TAG}"
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+      - name: Set up JDK 17
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build APK
+        if: steps.check.outputs.exists == 'false'
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Create Release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.PAT }}
+        run: |
+          TAG="${{ steps.tag.outputs.version }}"
+          APK_SRC=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          APK_PATH="LibChecker_${TAG}.apk"
+          mv "$APK_SRC" "$APK_PATH"
+          gh release create "fork_${TAG}" \
+            --repo "${{ github.repository }}" \
+            --title "LibChecker fork_${TAG}" \
+            --notes "Based on upstream tag ${TAG} with app-export patch" \
+            "$APK_PATH"
